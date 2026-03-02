@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gantt Builder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=DM+Sans:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="gantt.css">
+</head>
+<body>
+
+<div id="topbar">
+  <div class="logo"><div class="logo-dot"></div>Gantt Builder</div>
+  <div class="seg">
+    <button class="seg-btn on" id="btnCsv" onclick="switchPanel('csv')">CSV Import</button>
+    <button class="seg-btn"   id="btnTbl" onclick="switchPanel('table')">Task Editor</button>
+  </div>
+  <div class="spacer"></div>
+  <button class="tbtn" onclick="exportCSV()">↓ CSV</button>
+  <button class="tbtn primary" onclick="render()">▶ Render</button>
+</div>
+
+<div id="main">
+
+  <!-- ── Sidebar ── -->
+  <div id="sidebar">
+
+    <!-- CSV panel -->
+    <div class="panel" id="csvPanel">
+      <div class="panel-hdr">
+        <span class="panel-hdr-title">CSV Input</span>
+        <button class="shbtn" onclick="document.getElementById('fileInput').click()">Browse…</button>
+      </div>
+      <input type="file" id="fileInput" accept=".csv,.txt" onchange="onFileChange(event)">
+
+      <div id="csvDropZone"
+           onclick="document.getElementById('fileInput').click()"
+           ondragover="onDragOver(event)"
+           ondragleave="onDragLeave(event)"
+           ondrop="onDrop(event)">
+        <div class="dz-icon">📂</div>
+        <div class="dz-title">Drop CSV here or click to browse</div>
+        <div class="dz-sub">Supports: Task Name · Duration · Parent Task<br>Required Tasks · Thread Id</div>
+      </div>
+
+      <div class="csv-body">
+        <div class="lbl">CSV content</div>
+        <textarea id="csvText" placeholder="Or paste CSV directly here…"
+                  spellcheck="false" oninput="scheduleSync()"></textarea>
+        <div class="hint">
+          Columns: <b>Task Name</b>, <b>Task Duration</b> (seconds, blank = auto from children),
+          <b>Parent Task</b>, <b>Required Tasks</b> (semicolon-separated), <b>Thread Id</b>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table editor panel -->
+    <div class="panel" id="tblPanel" style="display:none">
+      <div class="panel-hdr">
+        <span class="panel-hdr-title">Task Editor</span>
+        <button class="shbtn" onclick="addRow()">+ Add row</button>
+      </div>
+      <div class="tbl-wrap">
+        <table id="taskTbl">
+          <thead>
+            <tr>
+              <th style="width:26%">Name</th>
+              <th style="width:13%">Dur(s)</th>
+              <th style="width:18%">Parent</th>
+              <th style="width:22%">Requires</th>
+              <th style="width:14%">Thread</th>
+              <th style="width:7%"></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="tbl-foot">
+        <button class="shbtn danger" onclick="clearRows()">Clear all</button>
+      </div>
+    </div>
+
+  </div><!-- /sidebar -->
+
+  <div id="resizer"></div>
+
+  <!-- ── Chart area ── -->
+  <div id="chartArea">
+    <div id="chartEmpty">
+      <div class="empty-icon">▬▬</div>
+      <div class="empty-title">No chart rendered yet</div>
+      <div class="empty-sub">Load a CSV or add tasks, then click ▶ Render</div>
+    </div>
+    <div id="chartScroll" style="display:none">
+      <div id="ganttRoot"></div>
+    </div>
+    <div id="statsBar"></div>
+  </div>
+
+</div><!-- /main -->
+
+<div id="tip"></div>
+<div id="toast"></div>
+
+<script src="gantt.js"></script>
+</body>
+</html>

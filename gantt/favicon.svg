@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7" fill="#111115"/>
+  <!-- Row 1 bars -->
+  <rect x="4"  y="6"  width="14" height="4" rx="2" fill="#5b8af5"/>
+  <!-- Row 2 bars -->
+  <rect x="4"  y="13" width="7"  height="4" rx="2" fill="#3ecfa6"/>
+  <rect x="13" y="13" width="10" height="4" rx="2" fill="#3ecfa6" opacity=".7"/>
+  <!-- Row 3 bars -->
+  <rect x="10" y="20" width="12" height="4" rx="2" fill="#e06c8a"/>
+  <!-- Row 4 bar -->
+  <rect x="4"  y="27" width="24" height="2" rx="1" fill="#2e2e3c"/>
+</svg>
