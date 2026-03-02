@@ -345,6 +345,11 @@ function buildGantt(tasks, threadOrder) {
         b.appendChild(sp);
         b.addEventListener('mousemove', e => showTip(e, t, c0));
         b.addEventListener('mouseleave', hideTip);
+        b.addEventListener('touchend', e => {
+          e.preventDefault();
+          if (isMobile()) showTouchTip(t, c0);
+          else { showTip(e.changedTouches[0], t, c0); setTimeout(hideTip, 2500); }
+        });
         lane.appendChild(b);
       }
 
@@ -570,6 +575,8 @@ function render() {
     document.getElementById('chartEmpty').style.display  = 'none';
     document.getElementById('chartScroll').style.display = 'block';
     buildGantt(tasks, threadOrder);
+    // On mobile, auto-switch to the chart view after a successful render
+    if (isMobile()) mobileTab('chart');
   } catch (e) {
     toast(e.message);
   }
@@ -610,7 +617,9 @@ function toast(msg) {
 //  SIDEBAR RESIZE
 // ════════════════════════════════════════════════════════
 
+// Desktop sidebar resize
 document.getElementById('resizer').addEventListener('mousedown', e => {
+  if (isMobile()) return;
   e.preventDefault();
   const move = ev => {
     const w = Math.max(240, Math.min(600, ev.clientX));
@@ -622,6 +631,69 @@ document.getElementById('resizer').addEventListener('mousedown', e => {
   };
   document.addEventListener('mousemove', move);
   document.addEventListener('mouseup', up);
+});
+
+// ════════════════════════════════════════════════════════
+//  MOBILE HELPERS
+// ════════════════════════════════════════════════════════
+
+function isMobile() { return window.innerWidth <= 700; }
+
+// Mobile bottom-nav view switching
+function mobileTab(tab) {
+  const sidebar    = document.getElementById('sidebar');
+  const chartArea  = document.getElementById('chartArea');
+  const bnavInput  = document.getElementById('bnavInput');
+  const bnavChart  = document.getElementById('bnavChart');
+  if (!bnavInput) return; // desktop — no bottom nav
+
+  if (tab === 'input') {
+    sidebar.style.display   = 'flex';
+    chartArea.style.display = 'none';
+    bnavInput.classList.add('on');
+    bnavChart.classList.remove('on');
+  } else {
+    sidebar.style.display   = 'none';
+    chartArea.style.display = 'flex';
+    bnavInput.classList.remove('on');
+    bnavChart.classList.add('on');
+  }
+}
+
+
+
+// Touch tooltip — tap bar to show, tap sheet or outside to dismiss
+function showTouchTip(t, color) {
+  const tip = document.getElementById('tip');
+  tip.innerHTML = `
+    <span class="tip-drag-handle"></span>
+    <div class="tn" style="color:${color}">${t.name}</div>
+    ${t.thread_id ? `<div><span class="tk">Thread  </span>${t.thread_id}</div>` : ''}
+    ${t.parent    ? `<div><span class="tk">Parent  </span>${t.parent}</div>`    : ''}
+    <div><span class="tk">Depth   </span>${t.depth}</div>
+    <div><span class="tk">Start   </span>${fmt(t.start)}</div>
+    <div><span class="tk">End     </span>${fmt(t.end)}</div>
+    <div><span class="tk">Duration </span>${fmt(t.duration)}</div>
+    ${t.required.length ? `<div><span class="tk">Requires </span>${t.required.join(', ')}</div>` : ''}
+  `;
+  tip.style.display = 'block';
+  // Force reflow then add class to trigger CSS transition
+  tip.offsetHeight;
+  tip.classList.add('visible');
+}
+
+function hideTouchTip() {
+  const tip = document.getElementById('tip');
+  tip.classList.remove('visible');
+  setTimeout(() => { if (!tip.classList.contains('visible')) tip.style.display = 'none'; }, 240);
+}
+
+// Dismiss touch tip by tapping the sheet itself or the backdrop
+document.addEventListener('click', e => {
+  const tip = document.getElementById('tip');
+  if (tip.classList.contains('visible') && !e.target.closest('.bar')) {
+    hideTouchTip();
+  }
 });
 
 // ════════════════════════════════════════════════════════

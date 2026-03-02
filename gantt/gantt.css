@@ -458,3 +458,142 @@ body {
 /* ─── button danger variant ───────────────────────────── */
 .shbtn.danger { color: var(--a2); border-color: var(--a2); }
 .shbtn.danger:hover { background: rgba(224, 108, 138, .08); }
+
+/* ════════════════════════════════════════════════════════
+   MOBILE  (≤ 700px)
+   Strategy:
+   - Stack sidebar above chart (full-width panels)
+   - Hide desktop top-bar input tabs + resizer
+   - Add bottom nav to toggle Input / Chart views
+   - Shrink gantt label column
+   - Touch tooltip: tap bar → sheet slides up from bottom
+   ════════════════════════════════════════════════════════ */
+
+/* ─── bottom nav (mobile only) ────────────────────────── */
+#bottomNav {
+  display: none;
+}
+
+@media (max-width: 700px) {
+
+  /* Allow page to scroll naturally on mobile */
+  html, body { overflow: auto; height: auto; }
+  body { min-height: 100dvh; }
+
+  /* Topbar: hide desktop panel tabs, keep logo + actions */
+  .seg     { display: none; }
+  .spacer  { display: none; }
+  #topbar  { gap: 10px; padding: 0 14px; justify-content: space-between; }
+  .tbtn    { padding: 5px 11px; font-size: 9.5px; }
+
+  /* Main becomes vertical stack, no overflow:hidden */
+  #main {
+    flex-direction: column;
+    overflow: visible;
+    flex: none;
+  }
+
+  /* Sidebar: full width, natural height, no fixed right border */
+  #sidebar {
+    width: 100% !important;   /* override JS inline style */
+    border-right: none;
+    border-bottom: 1px solid var(--brd);
+    overflow: visible;
+    flex-shrink: 0;
+  }
+
+  /* Panels scroll naturally */
+  .panel { overflow: visible; }
+  .csv-body { overflow: visible; }
+  #csvText  { min-height: 160px; resize: vertical; }
+
+  /* Table editor: allow horizontal scroll */
+  .tbl-wrap { overflow-x: auto; overflow-y: auto; max-height: 360px; }
+
+  /* Hide resizer on mobile */
+  #resizer { display: none; }
+
+  /* Chart area: natural height, don't grow to fill */
+  #chartArea { flex: none; min-height: 60dvh; display: flex; flex-direction: column; }
+  #chartScroll { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; padding: 12px; }
+  #chartEmpty  { min-height: 200px; }
+
+  /* Gantt: narrower label column */
+  :root { --lw: 130px; --sh: 40px; }
+  .g-lbl-inner span { font-size: 9.5px; }
+  .gantt-wrap { min-width: 0; border-radius: 8px; }
+
+  /* Stats: wrap tightly */
+  #statsBar { padding: 8px 12px; gap: 7px; }
+  .stat { padding: 5px 10px; }
+  .stat-val { font-size: 13px; }
+
+  /* Bottom nav */
+  #bottomNav {
+    display: flex;
+    position: sticky;
+    bottom: 0;
+    z-index: 50;
+    background: var(--surf);
+    border-top: 1px solid var(--brd);
+    height: 54px;
+    flex-shrink: 0;
+  }
+  .bnav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    background: none;
+    border: none;
+    color: var(--txt2);
+    font-family: var(--mono);
+    font-size: 9px;
+    cursor: pointer;
+    transition: color .12s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bnav-btn.on { color: var(--a1); }
+  .bnav-btn svg { width: 18px; height: 18px; }
+
+  /* Mobile tooltip: slides up from bottom as a sheet */
+  #tip {
+    display: none;
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    max-width: 100%;
+    border-radius: 14px 14px 0 0;
+    border: 1px solid var(--brd2);
+    border-bottom: none;
+    padding: 16px 20px 24px;
+    font-size: 12px;
+    line-height: 2;
+    pointer-events: auto;   /* tappable to dismiss */
+    z-index: 2000;
+    box-shadow: 0 -8px 32px rgba(0,0,0,.7);
+    transform: translateY(100%);
+    transition: transform .22s cubic-bezier(.32,1,.38,1);
+  }
+  #tip.visible {
+    display: block;
+    transform: translateY(0);
+  }
+  .tip-drag-handle {
+    display: block;
+    width: 36px; height: 4px;
+    background: var(--brd2);
+    border-radius: 2px;
+    margin: 0 auto 12px;
+  }
+  .tn { font-size: 14px; }
+  .tk { font-size: 10px; }
+
+  /* Bars: slightly taller for touch targets */
+  .bar { height: 26px; }
+  .bar:active { filter: brightness(1.35); transform: translateY(-50%) scaleY(1.1); }
+
+  /* Toast: account for bottom nav */
+  #toast { bottom: 64px; }
+}
