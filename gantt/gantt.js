@@ -564,7 +564,7 @@ function onDrop(e) {
 //  MAIN RENDER
 // ════════════════════════════════════════════════════════
 
-function render() {
+function render(switchTab = true) {
   try {
     if (activePanel === 'table') flushTable();
     const text = getCsvText();
@@ -575,8 +575,8 @@ function render() {
     document.getElementById('chartEmpty').style.display  = 'none';
     document.getElementById('chartScroll').style.display = 'block';
     buildGantt(tasks, threadOrder);
-    // On mobile, auto-switch to the chart view after a successful render
-    if (isMobile()) mobileTab('chart');
+    // Only auto-switch to chart on explicit user-triggered render, not auto-rerender
+    if (switchTab && isMobile()) mobileTab('chart');
   } catch (e) {
     toast(e.message);
   }
@@ -637,26 +637,34 @@ document.getElementById('resizer').addEventListener('mousedown', e => {
 //  MOBILE HELPERS
 // ════════════════════════════════════════════════════════
 
-function isMobile() { return window.innerWidth <= 700; }
+function isMobile() {
+  return window.innerWidth <= 700 ||
+    (window.innerHeight <= 500 && window.innerWidth > window.innerHeight);
+}
 
 // Mobile bottom-nav view switching
 function mobileTab(tab) {
-  const sidebar    = document.getElementById('sidebar');
-  const chartArea  = document.getElementById('chartArea');
-  const bnavInput  = document.getElementById('bnavInput');
-  const bnavChart  = document.getElementById('bnavChart');
-  if (!bnavInput) return; // desktop — no bottom nav
+  if (!isMobile()) return;
 
-  if (tab === 'input') {
-    sidebar.style.display   = 'flex';
-    chartArea.style.display = 'none';
-    bnavInput.classList.add('on');
-    bnavChart.classList.remove('on');
-  } else {
+  const sidebar   = document.getElementById('sidebar');
+  const chartArea = document.getElementById('chartArea');
+
+  // Update nav button states
+  ['input','editor','chart'].forEach(t => {
+    const btn = document.getElementById('bnav' + t.charAt(0).toUpperCase() + t.slice(1));
+    if (btn) btn.classList.toggle('on', t === tab);
+  });
+
+  if (tab === 'chart') {
     sidebar.style.display   = 'none';
     chartArea.style.display = 'flex';
-    bnavInput.classList.remove('on');
-    bnavChart.classList.add('on');
+    chartArea.classList.add('visible');
+  } else {
+    sidebar.style.display   = 'flex';
+    chartArea.style.display = 'none';
+    chartArea.classList.remove('visible');
+    // Show the right panel inside the sidebar
+    switchPanel(tab === 'editor' ? 'table' : 'csv');
   }
 }
 
@@ -676,19 +684,15 @@ function showTouchTip(t, color) {
     <div><span class="tk">Duration </span>${fmt(t.duration)}</div>
     ${t.required.length ? `<div><span class="tk">Requires </span>${t.required.join(', ')}</div>` : ''}
   `;
-  tip.style.display = 'block';
-  // Force reflow then add class to trigger CSS transition
-  tip.offsetHeight;
-  tip.classList.add('visible');
+  // rAF ensures the new content is painted before the transition fires
+  requestAnimationFrame(() => tip.classList.add('visible'));
 }
 
 function hideTouchTip() {
-  const tip = document.getElementById('tip');
-  tip.classList.remove('visible');
-  setTimeout(() => { if (!tip.classList.contains('visible')) tip.style.display = 'none'; }, 240);
+  document.getElementById('tip').classList.remove('visible');
 }
 
-// Dismiss touch tip by tapping the sheet itself or the backdrop
+// Dismiss touch tip by tapping outside a bar
 document.addEventListener('click', e => {
   const tip = document.getElementById('tip');
   if (tip.classList.contains('visible') && !e.target.closest('.bar')) {
@@ -724,3 +728,33 @@ Post-deploy Monitor,2,Release & Deploy,Production Deploy,Ops`;
 
 document.getElementById('csvText').value = SAMPLE;
 render();
+
+// ════════════════════════════════════════════════════════
+//  AUTO RE-RENDER ON RESIZE / ROTATION
+//  Only re-renders when the chart container width actually
+//  changes — ignores tab-switch reflows which don't change width.
+// ════════════════════════════════════════════════════════
+let reRenderTimer = null;
+let lastChartWidth = 0;
+
+function scheduleReRender() {
+  const chartScroll = document.getElementById('chartScroll');
+  if (chartScroll.style.display === 'none') return; // no chart yet
+  const w = document.getElementById('chartArea').offsetWidth;
+  if (w === lastChartWidth) return; // same width — ignore (tab switch, etc.)
+  clearTimeout(reRenderTimer);
+  reRenderTimer = setTimeout(() => {
+    lastChartWidth = document.getElementById('chartArea').offsetWidth;
+    render(false);
+  }, 250);
+}
+
+if (window.ResizeObserver) {
+  new ResizeObserver(scheduleReRender).observe(document.getElementById('chartArea'));
+} else {
+  window.addEventListener('resize', scheduleReRender);
+}
+window.addEventListener('orientationchange', () => {
+  lastChartWidth = 0; // force re-render on orientation change
+  scheduleReRender();
+});

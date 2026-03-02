@@ -474,7 +474,7 @@ body {
   display: none;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 700px), (max-height: 500px) and (orientation: landscape) {
 
   /* Allow page to scroll naturally on mobile */
   html, body { overflow: auto; height: auto; }
@@ -514,7 +514,8 @@ body {
   #resizer { display: none; }
 
   /* Chart area: natural height, don't grow to fill */
-  #chartArea { flex: none; min-height: 60dvh; display: flex; flex-direction: column; }
+  #chartArea { flex: none; display: flex; flex-direction: column; }
+  #chartArea.visible { min-height: 60dvh; }
   #chartScroll { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; padding: 12px; }
   #chartEmpty  { min-height: 200px; }
 
@@ -560,7 +561,7 @@ body {
 
   /* Mobile tooltip: slides up from bottom as a sheet */
   #tip {
-    display: none;
+    display: block;           /* always in DOM, moved off-screen by transform */
     position: fixed;
     left: 0; right: 0; bottom: 0;
     max-width: 100%;
@@ -570,15 +571,17 @@ body {
     padding: 16px 20px 24px;
     font-size: 12px;
     line-height: 2;
-    pointer-events: auto;   /* tappable to dismiss */
+    pointer-events: none;
     z-index: 2000;
     box-shadow: 0 -8px 32px rgba(0,0,0,.7);
-    transform: translateY(100%);
+    transform: translateY(110%);
     transition: transform .22s cubic-bezier(.32,1,.38,1);
+    visibility: hidden;       /* prevent interaction while off-screen */
   }
   #tip.visible {
-    display: block;
     transform: translateY(0);
+    pointer-events: auto;
+    visibility: visible;
   }
   .tip-drag-handle {
     display: block;
@@ -594,6 +597,29 @@ body {
   .bar { height: 26px; }
   .bar:active { filter: brightness(1.35); transform: translateY(-50%) scaleY(1.1); }
 
-  /* Toast: account for bottom nav */
-  #toast { bottom: 64px; }
+  /* Toast: always hides below viewport, account for bottom nav */
+  #toast { bottom: 64px; transform: translateX(-50%) translateY(200px); }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+}
+
+/* ─── landscape phone tweaks ──────────────────────────── */
+@media (max-height: 500px) and (orientation: landscape) {
+
+  /* Compact bottom nav: row of small buttons, less height */
+  #bottomNav { height: 40px; }
+  .bnav-btn  { font-size: 8px; gap: 2px; }
+  .bnav-btn svg { width: 14px; height: 14px; }
+
+  /* Chart takes full remaining height */
+  #chartArea { min-height: 0; flex: 1; }
+  #chartScroll { padding: 8px; }
+
+  /* Tighter gantt rows */
+  :root { --sh: 32px; --lw: 110px; }
+
+  /* Textarea shorter in landscape */
+  #csvText { min-height: 80px; }
+
+  /* Toast above compact nav */
+  #toast { bottom: 50px; }
 }
