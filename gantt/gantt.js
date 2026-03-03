@@ -480,13 +480,23 @@ function tableToCSV() {
 
 function flushTable() {
   const csv = tableToCSV();
-  if (csv) document.getElementById('csvText').value = csv;
+  if (csv) {
+    document.getElementById('csvText').value = csv;
+    try { localStorage.setItem('gantt-csv', csv); } catch(_) {}
+    scheduleContentRender();
+  }
 }
 
 let syncTimer;
 function scheduleSync() {
   clearTimeout(syncTimer);
-  syncTimer = setTimeout(() => { if (activePanel === 'table') populateTable(); }, 400);
+  syncTimer = setTimeout(() => {
+    if (activePanel === 'table') populateTable();
+    // Persist CSV to localStorage
+    try { localStorage.setItem('gantt-csv', document.getElementById('csvText').value); } catch(_) {}
+    // Auto-update chart if one is already rendered
+    scheduleContentRender();
+  }, 400);
 }
 
 function addRow(name = '', dur = '', parent = '', req = '', thread = '') {
@@ -701,6 +711,38 @@ document.addEventListener('click', e => {
 });
 
 // ════════════════════════════════════════════════════════
+//  THEME
+// ════════════════════════════════════════════════════════
+
+const MOON_ICON = `<svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"/>
+</svg>`;
+
+const SUN_ICON = `<svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="5"/>
+  <line x1="12" y1="1"  x2="12" y2="3"/>
+  <line x1="12" y1="21" x2="12" y2="23"/>
+  <line x1="4.22" y1="4.22"  x2="5.64" y2="5.64"/>
+  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+  <line x1="1"  y1="12" x2="3"  y2="12"/>
+  <line x1="21" y1="12" x2="23" y2="12"/>
+  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+</svg>`;
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const btn = document.getElementById('themeToggle');
+  if (btn) btn.innerHTML = theme === 'light' ? MOON_ICON : SUN_ICON;
+  try { localStorage.setItem('gantt-theme', theme); } catch(_) {}
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  applyTheme(current === 'light' ? 'dark' : 'light');
+}
+
+// ════════════════════════════════════════════════════════
 //  INIT
 // ════════════════════════════════════════════════════════
 
@@ -726,16 +768,37 @@ QA Sign-off,2,Release & Deploy,Staging Deploy,Ops
 Production Deploy,1,Release & Deploy,QA Sign-off,Ops
 Post-deploy Monitor,2,Release & Deploy,Production Deploy,Ops`;
 
-document.getElementById('csvText').value = SAMPLE;
+// Restore saved CSV or fall back to sample
+(function() {
+  let saved = null;
+  try { saved = localStorage.getItem('gantt-csv'); } catch(_) {}
+  document.getElementById('csvText').value = saved || SAMPLE;
+})();
+
+// Apply persisted or system theme before first render
+(function() {
+  let theme = 'dark';
+  try { theme = localStorage.getItem('gantt-theme') || theme; } catch(_) {}
+  if (theme === 'dark' && window.matchMedia('(prefers-color-scheme: light)').matches) theme = 'light';
+  applyTheme(theme);
+})();
+
 render();
 
 // ════════════════════════════════════════════════════════
-//  AUTO RE-RENDER ON RESIZE / ROTATION
-//  Only re-renders when the chart container width actually
-//  changes — ignores tab-switch reflows which don't change width.
+//  AUTO RE-RENDER ON RESIZE / ROTATION / CONTENT CHANGE
+//  scheduleReRender  — fires only when container width changes
+//                      (ignores tab-switch reflows)
+//  scheduleContentRender — fires when CSV content changes,
+//                          skips the width check
 // ════════════════════════════════════════════════════════
 let reRenderTimer = null;
 let lastChartWidth = 0;
+
+function _doReRender() {
+  lastChartWidth = document.getElementById('chartArea').offsetWidth;
+  render(false);
+}
 
 function scheduleReRender() {
   const chartScroll = document.getElementById('chartScroll');
@@ -743,10 +806,14 @@ function scheduleReRender() {
   const w = document.getElementById('chartArea').offsetWidth;
   if (w === lastChartWidth) return; // same width — ignore (tab switch, etc.)
   clearTimeout(reRenderTimer);
-  reRenderTimer = setTimeout(() => {
-    lastChartWidth = document.getElementById('chartArea').offsetWidth;
-    render(false);
-  }, 250);
+  reRenderTimer = setTimeout(_doReRender, 250);
+}
+
+function scheduleContentRender() {
+  const chartScroll = document.getElementById('chartScroll');
+  if (chartScroll.style.display === 'none') return; // no chart rendered yet
+  clearTimeout(reRenderTimer);
+  reRenderTimer = setTimeout(_doReRender, 600); // slightly longer for typing comfort
 }
 
 if (window.ResizeObserver) {
