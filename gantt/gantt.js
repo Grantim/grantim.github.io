@@ -85,6 +85,31 @@ function parseCSV(text) {
     }
   }
 
+  // Topologically sort each thread's task list by their explicit requires,
+  // so injection order matches dependency order regardless of CSV row order.
+  function topoSortThread(names) {
+    const nameSet = new Set(names);
+    const inDeg = {}, adj = {};
+    for (const n of names) { inDeg[n] = 0; adj[n] = []; }
+    for (const n of names) {
+      for (const r of tasks[n].required) {
+        if (nameSet.has(r)) { adj[r].push(n); inDeg[n]++; }
+      }
+    }
+    const queue = names.filter(n => inDeg[n] === 0);
+    const result = [];
+    while (queue.length) {
+      const n = queue.shift();
+      result.push(n);
+      for (const m of adj[n]) { if (--inDeg[m] === 0) queue.push(m); }
+    }
+    return result.length === names.length ? result : names; // fallback: keep original
+  }
+
+  for (const tid of Object.keys(threadOrder)) {
+    threadOrder[tid] = topoSortThread(threadOrder[tid]);
+  }
+
   // Thread-sequential injection — same-parent siblings only
   for (const names of Object.values(threadOrder)) {
     for (let i = 1; i < names.length; i++) {
