@@ -633,6 +633,221 @@ function exportCSV() {
   dl('gantt.csv', csv, 'text/csv');
 }
 
+function exportSVG() {
+  const csvText = getCsvText();
+  if (!csvText) { toast('No data to export.'); return; }
+  try {
+    const { tasks, threadOrder } = parseCSV(csvText);
+    resolveNulls(tasks);
+    const svg = buildGanttSVG(tasks, threadOrder);
+    dl('gantt.svg', svg, 'image/svg+xml');
+  } catch(e) { toast(e.message); }
+}
+
+function buildGanttSVG(tasks, threadOrder, {
+  width  = 900,
+  height = null,   // null = auto from row count
+  theme  = null,   // null = read from current CSS vars
+} = {}) {
+  // ── Layout constants ──────────────────────────────────
+  const LW      = 150;          // label column width
+  const SH      = 48;           // sublayer row height
+  const HDR_H   = 36;           // timeline header height
+  const BAR_H   = 30;           // bar height
+  const BAR_R   = 5;            // bar corner radius
+  const PAD     = 20;           // outer padding
+  const FONT    = 'IBM Plex Mono, monospace';
+  const SANS    = 'DM Sans, sans-serif';
+
+  // ── Theme colours ─────────────────────────────────────
+  const THEMES = {
+    dark: {
+      bg:'#0c0c0e', surf:'#111115', surf2:'#16161b',
+      brd:'#22222c', brd2:'#2e2e3c',
+      txt:'#dddde8', txt2:'#8888a0', txt3:'#50505f',
+    },
+    light: {
+      bg:'#f4f4f7', surf:'#ffffff', surf2:'#f0f0f4',
+      brd:'#dcdce6', brd2:'#c8c8d8',
+      txt:'#1a1a2e', txt2:'#606080', txt3:'#a0a0b8',
+    },
+  };
+
+  let C;
+  if (theme && THEMES[theme]) {
+    C = THEMES[theme];
+  } else {
+    // Read from live CSS custom properties
+    const cs = getComputedStyle(document.documentElement);
+    const cv = k => cs.getPropertyValue(k).trim();
+    C = {
+      bg:    cv('--bg'),    surf:  cv('--surf'),  surf2: cv('--surf2'),
+      brd:   cv('--brd'),   brd2:  cv('--brd2'),
+      txt:   cv('--txt'),   txt2:  cv('--txt2'),  txt3:  cv('--txt3'),
+    };
+  }
+
+  // ── Reset colour cache so SVG matches current render ──
+  Object.keys(colorCache).forEach(k => delete colorCache[k]);
+  colorIdx = 0;
+
+  const total  = Math.max(...Object.values(tasks).map(t => t.end));
+  const vd     = computeDepths(tasks, threadOrder);
+  const threaded = new Set(Object.values(threadOrder).flat());
+
+  function makeSubs(list) {
+    const rmin = Math.min(...list.map(t => vd[t.name]));
+    const byD = {}, depths = {};
+    for (const t of list) {
+      const d = vd[t.name] - rmin;
+      depths[t.name] = d;
+      if (!byD[d]) byD[d] = [];
+      byD[d].push(t);
+    }
+    return {
+      layers: Object.keys(byD).sort((a,b) => +a - +b).map(d => byD[d]),
+      depths,
+    };
+  }
+
+  // ── Build rows ────────────────────────────────────────
+  const rows = [];
+  for (const [tid, ns] of Object.entries(threadOrder)) {
+    const list = ns.map(n => tasks[n]);
+    const { layers, depths } = makeSubs(list);
+    rows.push({ label: tid, tid, layers, depths, rs: Math.min(...list.map(t => t.start)) });
+  }
+  for (const [name, t] of Object.entries(tasks)) {
+    if (threaded.has(name)) continue;
+    const { layers, depths } = makeSubs([t]);
+    rows.push({ label: name, tid: null, layers, depths, rs: t.start });
+  }
+  rows.sort((a,b) => a.rs - b.rs);
+
+  // ── Compute total height ──────────────────────────────
+  const totalSubLayers = rows.reduce((s, r) => s + r.layers.length, 0);
+  const autoH   = HDR_H + totalSubLayers * SH;
+  const chartH  = height != null ? height - PAD * 2 : autoH;
+  const totalW  = width;
+  const TW      = totalW - LW - PAD * 2;       // timeline pixel width
+  const SVG_W   = totalW + PAD * 2;
+  const SVG_H   = chartH + PAD * 2;
+
+  const step   = pickStep(total, Math.floor(TW / 60));
+  const x0     = PAD + LW;                    // timeline area left edge
+
+  // ── SVG helpers ───────────────────────────────────────
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const parts = [];
+  const p = s => parts.push(s);
+
+  // ── Gradient defs ─────────────────────────────────────
+  const gradDefs = [];
+  const gradId = {};
+  for (const row of rows) {
+    const key = row.tid || 'solo:' + row.label;
+    const [c0, c1] = getColor(key);
+    for (let di = 0; di < row.layers.length; di++) {
+      const bright = BRIGHT[Math.min(di, BRIGHT.length - 1)];
+      const id = `g_${gradDefs.length}`;
+      gradId[key + '_' + di] = id;
+      gradDefs.push(`<linearGradient id="${id}" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%"   stop-color="${c0}" stop-opacity="${bright}"/>
+        <stop offset="100%" stop-color="${c1}" stop-opacity="${bright}"/>
+      </linearGradient>`);
+    }
+  }
+
+  // ── Header ────────────────────────────────────────────
+  p(`<?xml version="1.0" encoding="UTF-8"?>`);
+  p(`<svg xmlns="http://www.w3.org/2000/svg" width="${SVG_W}" height="${SVG_H}" viewBox="0 0 ${SVG_W} ${SVG_H}">`);
+  p(`<defs>${gradDefs.join('')}</defs>`);
+
+  // No background — transparent SVG;
+
+  // Outer border rect
+  const cx = PAD, cy = PAD;
+  p(`<rect x="${cx}" y="${cy}" width="${totalW}" height="${chartH}" rx="10" fill="${C.surf}" stroke="${C.brd}" stroke-width="1"/>`);
+
+  // Header bg
+  p(`<rect x="${cx}" y="${cy}" width="${totalW}" height="${HDR_H}" rx="10" fill="${C.surf2}"/>`);
+  p(`<rect x="${cx}" y="${cy + HDR_H - 2}" width="${totalW}" height="2" fill="${C.brd}"/>`);
+
+  // Label col header
+  p(`<text x="${cx + 10}" y="${cy + HDR_H / 2 + 4}" font-family="${FONT}" font-size="9" fill="${C.txt2}" letter-spacing="1" text-anchor="start">THREAD / TASK</text>`);
+
+  // Tick marks
+  for (let t = 0; t <= total; t += step) {
+    const tx = x0 + (t / total) * TW;
+    p(`<line x1="${tx}" y1="${cy}" x2="${tx}" y2="${cy + HDR_H - 2}" stroke="${C.brd}" stroke-width="1"/>`);
+    p(`<text x="${tx + 3}" y="${cy + HDR_H - 7}" font-family="${FONT}" font-size="9" fill="${C.txt2}">${esc(fmt(t))}</text>`);
+  }
+
+  // ── Rows ──────────────────────────────────────────────
+  // Reset colour cache again so row colours match
+  Object.keys(colorCache).forEach(k => delete colorCache[k]);
+  colorIdx = 0;
+
+  let rowY = cy + HDR_H;
+  for (const row of rows) {
+    const key = row.tid || 'solo:' + row.label;
+    const [c0] = getColor(key);
+    const rowH = row.layers.length * SH;
+
+    // Row bg (subtle for threaded rows)
+    if (row.tid) p(`<rect x="${cx}" y="${rowY}" width="${totalW}" height="${rowH}" fill="${C.surf}" opacity="0.5"/>`);
+
+    // Vertical divider between label and timeline
+    p(`<line x1="${x0}" y1="${rowY}" x2="${x0}" y2="${rowY + rowH}" stroke="${C.brd}" stroke-width="1"/>`);
+
+    // Label
+    const midY = rowY + rowH / 2;
+    if (row.tid) {
+      // pill
+      p(`<rect x="${cx + 8}" y="${midY - 8}" width="16" height="16" rx="8" fill="${c0}22"/>`);
+      p(`<text x="${cx + 16}" y="${midY + 4.5}" font-family="${SANS}" font-size="9" font-weight="700" fill="${c0}" text-anchor="middle">${esc(row.label.slice(0,1).toUpperCase())}</text>`);
+      p(`<text x="${cx + 28}" y="${midY + 4}" font-family="${FONT}" font-size="10" fill="${C.txt}" clip-path="url(#lclip)">${esc(row.label)}</text>`);
+    } else {
+      p(`<text x="${cx + 8}" y="${midY + 4}" font-family="${FONT}" font-size="10" fill="${C.txt}">${esc(row.label)}</text>`);
+    }
+
+    // Sublayers
+    for (let di = 0; di < row.layers.length; di++) {
+      const laneY = rowY + di * SH;
+      const gid   = gradId[key + '_' + di];
+
+      // Sublayer divider
+      if (di > 0) p(`<line x1="${x0}" y1="${laneY}" x2="${cx + totalW}" y2="${laneY}" stroke="${C.brd}" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>`);
+
+      // Grid lines
+      for (let t = step; t < total; t += step) {
+        const gx = x0 + (t / total) * TW;
+        p(`<line x1="${gx}" y1="${laneY}" x2="${gx}" y2="${laneY + SH}" stroke="${C.brd}" stroke-width="1" opacity="0.3"/>`);
+      }
+
+      // Bars
+      for (const t of row.layers[di]) {
+        const bx = x0 + (t.start / total) * TW;
+        const bw = Math.max((t.duration / total) * TW, 3);
+        const by = laneY + (SH - BAR_H) / 2;
+        p(`<rect x="${bx}" y="${by}" width="${bw}" height="${BAR_H}" rx="${BAR_R}" fill="url(#${gid})"/>`);
+        if (bw > 30) {
+          p(`<text x="${bx + 7}" y="${by + BAR_H / 2 + 4}" font-family="${FONT}" font-size="10" font-weight="600" fill="rgba(255,255,255,0.9)" clip-path="url(#bc_${gid})">${esc(t.name)}</text>`);
+          // Clip text to bar
+          p(`<clipPath id="bc_${gid}"><rect x="${bx}" y="${by}" width="${bw - 7}" height="${BAR_H}"/></clipPath>`);
+        }
+      }
+    }
+
+    // Row bottom border
+    p(`<line x1="${cx}" y1="${rowY + rowH}" x2="${cx + totalW}" y2="${rowY + rowH}" stroke="${C.brd}" stroke-width="1"/>`);
+    rowY += rowH;
+  }
+
+  p(`</svg>`);
+  return parts.join('\n');
+}
+
 function dl(name, content, mime) {
   const a = document.createElement('a');
   a.href     = URL.createObjectURL(new Blob([content], { type: mime }));
