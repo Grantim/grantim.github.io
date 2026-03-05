@@ -17,8 +17,8 @@
   --a6:        #5bc8e0;   /* cyan */
   --mono: 'IBM Plex Mono', monospace;
   --sans: 'DM Sans', sans-serif;
-  --lw: 240px;
-  --sh: 36px;
+  --lw: 120px;
+  --sh: 48px;
   --sidebar: 380px;
 }
 
@@ -44,7 +44,12 @@
 [data-theme="light"] .gantt-wrap   { background: var(--surf); }
 [data-theme="light"] .g-row.threaded { background: rgba(0,0,0,.018); }
 [data-theme="light"] .g-row:hover    { background: rgba(64,112,232,.04); }
-[data-theme="light"] .bar            { box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+[data-theme="light"] .bar            { box-shadow: 0 1px 4px rgba(0,0,0,.15); color: rgba(255,255,255,.95); }
+[data-theme="light"] .g-lbl-inner span { color: var(--txt); }
+[data-theme="light"] .sublayer-note   { color: var(--txt2); }
+[data-theme="light"] .tick            { color: #444458; }
+[data-theme="light"] .sublayer + .sublayer { border-top-color: rgba(0,0,0,.08); }
+[data-theme="light"] .gline           { background: #888; opacity: .12; }
 
 /* ─── theme toggle button ─────────────────────────────── */
 .icon-btn {
@@ -320,6 +325,10 @@ body {
 .empty-sub   { font-size: 10px; color: var(--txt3); }
 
 #chartScroll { flex: 1; overflow: auto; padding: 20px; }
+#csvText::-webkit-scrollbar { width: 4px; }
+#csvText::-webkit-scrollbar-thumb { background: var(--brd2); border-radius: 2px; }
+#csvText::-webkit-scrollbar-track { background: transparent; }
+
 #chartScroll::-webkit-scrollbar { width: 5px; height: 5px; }
 #chartScroll::-webkit-scrollbar-thumb { background: var(--brd2); border-radius: 3px; }
 
@@ -399,18 +408,18 @@ body {
 .g-timeline { flex: 1; display: flex; flex-direction: column; }
 .sublayer { position: relative; height: var(--sh); flex-shrink: 0; }
 .sublayer + .sublayer { border-top: 1px dashed rgba(255, 255, 255, .05); }
-.sl-indent { position: absolute; left: 0; top: 0; bottom: 0; opacity: .25; }
+.sl-indent { display: none; }
 
 .bar {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  height: 20px;
-  border-radius: 4px;
+  height: 30px;
+  border-radius: 5px;
   display: flex;
   align-items: center;
-  padding: 0 7px;
-  font-size: 9px;
+  padding: 0 9px;
+  font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -560,7 +569,7 @@ body {
   #chartEmpty  { min-height: 200px; }
 
   /* Gantt: narrower label column */
-  :root { --lw: 130px; --sh: 40px; }
+  :root { --lw: 90px; --sh: 48px; }
   .g-lbl-inner span { font-size: 9.5px; }
   .gantt-wrap { min-width: 0; border-radius: 8px; }
 
@@ -634,7 +643,7 @@ body {
   .tk { font-size: 10px; }
 
   /* Bars: slightly taller for touch targets */
-  .bar { height: 26px; }
+  .bar { height: 34px; font-size: 11px; }
   .bar:active { filter: brightness(1.35); transform: translateY(-50%) scaleY(1.1); }
 
   /* Toast: always hides below viewport, account for bottom nav */
@@ -655,7 +664,7 @@ body {
   #chartScroll { padding: 8px; }
 
   /* Tighter gantt rows */
-  :root { --sh: 32px; --lw: 110px; }
+  :root { --sh: 36px; --lw: 80px; }
 
   /* Textarea shorter in landscape */
   #csvText { min-height: 80px; }
