@@ -2,30 +2,35 @@
 
 A lightweight, browser-native Gantt chart tool. No server, no dependencies, no build step — just open `index.html`.
 
+**[Live demo →](https://grantim.github.io/gantt)**
+
 ---
 
 ## Features
 
-- **CSV Import** — drag-and-drop, file browse, or paste directly
+- **CSV Import** — drag-and-drop, file browse, or paste directly; chart auto-updates on change
 - **Task Editor** — spreadsheet-style table that syncs both ways with the CSV
 - **Auto-duration parents** — leave duration blank and the tool calculates it from children
-- **Thread rows** — tasks sharing a Thread Id are grouped into a single row
-- **Sublayers** — nested tasks stack visually within their row by depth
-- **Resizable sidebar** — drag the divider to give more room to the chart
+- **Thread rows** — tasks sharing a Thread Id are grouped into a single row with sublayers
+- **Dependency-order scheduling** — topological sort ensures correct ordering regardless of CSV row order
 - **Hover tooltips** — start, end, duration, depth, parent, and requirements on every bar
+- **Light / dark theme** — toggle in the topbar; preference persisted to localStorage
 - **CSV export** — download the current task list at any time
+- **SVG export** — download a self-contained, fully styled SVG (transparent background, fills container width)
+- **Mobile responsive** — bottom-nav tab layout, touch tooltips, auto re-render on rotation
+- **LocalStorage persistence** — CSV content saved automatically and restored on reload
 
 ---
 
 ## CSV Format
 
-| Column | Description |
-|---|---|
-| **Task Name** | Unique identifier for the task |
-| **Task Duration** | Duration in any consistent unit (days, seconds…). Leave blank to auto-compute from children |
-| **Parent Task** | Name of the parent task (for grouping / sublayers) |
-| **Required Tasks** | Semicolon-separated list of tasks that must finish before this one starts |
-| **Thread Id** | Tasks with the same Thread Id share a row and run sequentially within the same parent |
+| Column | Required | Description |
+|---|---|---|
+| **Task Name** | ✓ | Unique identifier for the task |
+| **Task Duration** | ✓ | Duration in any consistent unit (seconds, days…). Leave blank to auto-compute from children |
+| **Parent Task** | | Name of the parent task — for grouping and sublayer nesting |
+| **Required Tasks** | | Semicolon-separated tasks that must finish before this one starts |
+| **Thread Id** | | Tasks with the same Thread Id share a row and are chained sequentially within the same parent |
 
 ---
 
@@ -55,26 +60,7 @@ Production Deploy,1,Release & Deploy,QA Sign-off,Ops
 Post-deploy Monitor,2,Release & Deploy,Production Deploy,Ops
 ```
 
-This produces a 26-day timeline across three threads:
-
-- **Backend** — Design & Planning (days 0–6) → parallel Auth/Payments/Notifications → Integration Tests
-- **Frontend** — runs in parallel with Backend Work after planning; UI Components → Auth Flow + Checkout Flow → E2E Tests
-- **Ops** — Release & Deploy phase begins once both Backend Work and Frontend Work are complete
-
-The five parent tasks (`Release v2.4`, `Design & Planning`, `Backend Work`, `Frontend Work`, `Release & Deploy`) all have blank durations — the tool resolves them automatically from their children.
-
----
-
-## Files
-
-```
-index.html    — markup only; links to gantt.css and gantt.js
-gantt.css     — all styles and design tokens
-gantt.js      — parsing, scheduling, rendering, and UI logic
-favicon.svg   — app icon
-example.csv   — the software release pipeline above
-README.md     — this file
-```
+Three threads running in parallel across a 26-day timeline. Parent tasks (`Release v2.4`, `Design & Planning`, etc.) have blank durations — resolved automatically from their children.
 
 ---
 
@@ -82,28 +68,52 @@ README.md     — this file
 
 1. A task starts after all its **Required Tasks** have finished.
 2. A task starts no earlier than its **Parent Task** starts.
-3. Tasks on the same **Thread Id** with the same parent are linked sequentially (the tool injects the dependency automatically).
-4. **Null-duration parents** are resolved iteratively: the scheduler runs until each parent's span converges to the actual max end of its children — handling arbitrarily deep nesting correctly.
+3. Tasks on the same **Thread Id** with the same parent are topologically sorted then linked sequentially — works correctly regardless of CSV row order.
+4. **Null-duration parents** are resolved iteratively: the scheduler reruns until each parent's span converges to the actual max end of its children, handling arbitrarily deep nesting.
+
+---
+
+## File Structure
+
+```
+index.html          — app shell; loads gantt-core.js + gantt-ui.js
+gantt-core.js       — pure logic: CSV parsing, scheduling, SVG export (no DOM)
+gantt-ui.js         — DOM: tooltips, panels, table editor, export, theme, auto-render
+gantt.css           — styles and design tokens (light + dark theme)
+favicon.svg         — app icon
+example.csv         — the software release pipeline above
+svg/
+  index.html        — SVG-only endpoint: ?csv=<b64>&w=&h=&theme= → raw SVG
+README.md           — this file
+```
+
+---
+
+## SVG Export
+
+Click **↓ SVG** in the topbar to download a self-contained SVG of the current chart.
+
+The SVG uses `width="100%"` with a `viewBox`, so it scales to any container. The export function also accepts options programmatically:
+
+```js
+buildGanttSVG(tasks, threadOrder, {
+  width:  1600,      // internal coordinate width (default: 1600)
+  height: null,      // null = auto-fit to row count
+  theme:  'dark',    // 'dark' | 'light' | null (reads live CSS vars)
+})
+```
+
+To embed in a GitHub README, download the SVG, commit it to your repo, and link the raw URL:
+
+```markdown
+![Gantt Chart](https://raw.githubusercontent.com/you/repo/main/docs/gantt.svg)
+```
 
 ---
 
 ## Disclaimer
 
-This tool was built in collaboration with **Claude** (Anthropic), an AI assistant.
-
-The scheduling engine, null-duration resolution algorithm, visual depth computation, CSV parser, and the iterative convergence loop were all designed and debugged through an extended conversation with Claude — including several subtle bugs that Claude caught, reasoned through, and fixed:
-
-- Thread injection creating false cross-subtree dependencies
-- Null-duration parents not covering their grandchildren
-- Two-pass scheduling underestimating parallel child spans
-- Iterative convergence needed for deeply nested null-duration tasks
-
-The UI, color palette, layout, and overall design were also shaped by Claude's suggestions.
-
-Claude's contributions here go well beyond autocomplete — it acted as a genuine engineering partner, holding the full context of the scheduling logic across many iterations and proposing architecturally sound fixes rather than patches.
-
-> *"The best code review is one where the reviewer understands the problem better than you do."*
-> Claude understood this problem very well.
+Built in collaboration with **Claude** (Anthropic). The scheduling engine, null-duration resolution, topological sort, visual depth computation, CSV parser, SVG renderer, mobile layout, and iterative convergence logic were all designed and debugged through an extended conversation with Claude — including several subtle bugs caught, reasoned through, and fixed along the way.
 
 ---
 

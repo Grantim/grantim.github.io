@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <script src="../gantt-core.js"></script>
+</head>
+<body>
+<script>
+  const sp    = new URLSearchParams(location.search);
+  const b64   = sp.get('csv') || '';
+  const w     = parseInt(sp.get('w') || '900', 10);
+  const h     = sp.get('h') ? parseInt(sp.get('h'), 10) : null;
+  const theme = sp.get('theme') || 'dark';
+
+  let csv = '';
+  try { csv = decodeURIComponent(atob(b64)); } catch(_) {
+    try { csv = atob(b64); } catch(_) {}
+  }
+
+  let svg = '';
+  if (csv) {
+    try {
+      const { tasks, threadOrder } = parseCSV(csv);
+      resolveNulls(tasks);
+      svg = buildGanttSVG(tasks, threadOrder, { width: w, height: h, theme });
+    } catch(e) {
+      svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="40">
+        <rect width="400" height="40" rx="6" fill="#200a12"/>
+        <text x="10" y="26" font-family="monospace" font-size="12" fill="#e06c8a">Error: ${e.message}</text>
+      </svg>`;
+    }
+  } else {
+    svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="40">
+      <rect width="400" height="40" rx="6" fill="#111115"/>
+      <text x="10" y="26" font-family="monospace" font-size="12" fill="#8888a0">No CSV data provided.</text>
+    </svg>`;
+  }
+
+  document.open();
+  document.write(svg);
+  document.close();
+</script>
+</body>
+</html>
