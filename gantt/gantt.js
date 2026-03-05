@@ -85,7 +85,7 @@ function parseCSV(text) {
     }
   }
 
-  // Topologically sort each thread's task list by their explicit requires,
+  // Topologically sort each thread's task list using their explicit requires,
   // so injection order matches dependency order regardless of CSV row order.
   function topoSortThread(names) {
     const nameSet = new Set(names);
@@ -103,7 +103,7 @@ function parseCSV(text) {
       result.push(n);
       for (const m of adj[n]) { if (--inDeg[m] === 0) queue.push(m); }
     }
-    return result.length === names.length ? result : names; // fallback: keep original
+    return result.length === names.length ? result : names; // fallback: keep original order
   }
 
   for (const tid of Object.keys(threadOrder)) {
@@ -565,7 +565,12 @@ function clearRows() {
 
 function loadText(text) {
   document.getElementById('csvText').value = text;
+  try { localStorage.setItem('gantt-csv', text); } catch(_) {}
   if (activePanel === 'table') populateTable();
+  // Always render on file load — immediately if no chart yet, debounced otherwise
+  const chartScroll = document.getElementById('chartScroll');
+  if (chartScroll.style.display === 'none') render();
+  else scheduleContentRender();
 }
 
 function onFileChange(e) {
